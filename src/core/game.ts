@@ -15,6 +15,7 @@ import { pushMessages } from '../ui/message-log';
 import { Random } from '../utils/random';
 import { InputHandler, type InputAction } from './input-handler';
 import { Renderer, type RenderState } from './renderer';
+import { EffectManager } from '../systems/effects';
 
 type GameState = RenderState;
 
@@ -24,6 +25,7 @@ export class Game {
   private readonly renderer: Renderer;
   private readonly input: InputHandler;
   private readonly random = new Random();
+  private readonly effects = new EffectManager();
   private state: GameState = 'title';
   private floor = 1;
   private map!: DungeonMap;
@@ -49,6 +51,9 @@ export class Game {
   }
 
   private loop = (): void => {
+    const now = performance.now();
+    this.effects.update(now);
+
     this.renderer.render({
       state: this.state,
       floor: this.floor,
@@ -62,6 +67,8 @@ export class Game {
       messages: this.messages,
       visibleTiles: this.visibleTiles,
       highScores: this.highScores,
+      effects: this.effects.getActiveEffects(),
+      screenOffset: this.effects.getScreenOffset(),
     });
     this.animationFrame = window.requestAnimationFrame(this.loop);
   };
@@ -167,8 +174,10 @@ export class Game {
     if (enemy) {
       const result = attackTarget(this.player, enemy, this.random);
       const entries = [`プレイヤーの攻撃。${enemy.name}に${result.damage}ダメージ。`];
+      this.effects.onPlayerAttack(enemy.x, enemy.y, result.damage);
       if (result.defeated) {
         entries.push(...grantExperience(this.player, enemy));
+        this.effects.onEnemyDefeated(enemy.x, enemy.y);
       }
       this.messages = pushMessages(this.messages, entries);
       this.cleanupDefeatedEnemies();
@@ -252,6 +261,7 @@ export class Game {
     }
 
     this.player.hp = Math.max(0, this.player.hp - trap.damage);
+    this.effects.onPlayerHit(trap.damage, this.player.x, this.player.y);
     if (trap.kind === 'poison') {
       this.messages = pushMessages(this.messages, [`毒の罠を踏んだ！ ${trap.damage}ダメージを受けた。`]);
     } else {
@@ -311,6 +321,7 @@ export class Game {
       if (distance <= enemy.attackRange) {
         const result = attackTarget(enemy, this.player, this.random);
         this.messages = pushMessages(this.messages, [`${enemy.name}の攻撃。プレイヤーに${result.damage}ダメージ。`]);
+        this.effects.onPlayerHit(result.damage, this.player.x, this.player.y);
         if (this.player.hp <= 0) {
           return;
         }

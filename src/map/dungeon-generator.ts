@@ -163,7 +163,8 @@ export const generateDungeon = (floor: number, seed = Date.now()): FloorContent 
   };
 
   rooms.slice(1).forEach((room, index) => {
-    const enemyCount = random.int(0, floor >= 4 ? 3 : 2);
+    const maxEnemies = floor >= 4 ? 3 : floor >= 2 ? 2 : 1;
+    const enemyCount = random.int(0, maxEnemies);
     for (let count = 0; count < enemyCount; count += 1) {
       const position = tryPosition(room);
       if (!position) continue;
