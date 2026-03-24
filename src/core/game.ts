@@ -1,17 +1,20 @@
-import { MAX_HIGH_SCORES } from '../constants';
+import { MAP_HEIGHT, MAP_WIDTH, MAX_HIGH_SCORES } from '../constants';
+import { openChest, type Chest } from '../entities/chest';
+import type { Enemy } from '../entities/enemy';
+import { createItem, ITEM_TEMPLATES, type Item } from '../entities/item';
+import type { Npc } from '../entities/npc';
+import { createPlayer, type Player } from '../entities/player';
+import type { Trap } from '../entities/trap';
+import { generateDungeon, type DungeonMap } from '../map/dungeon-generator';
 import { decideEnemyStep } from '../systems/ai';
 import { attackTarget, grantExperience } from '../systems/combat';
 import { computeVisibleTiles } from '../systems/fov';
 import { useInventoryItem, tryAddItem } from '../systems/inventory';
 import { canMoveTo, moveActor } from '../systems/movement';
-import { generateDungeon, type DungeonMap } from '../map/dungeon-generator';
+import { pushMessages } from '../ui/message-log';
+import { Random } from '../utils/random';
 import { InputHandler, type InputAction } from './input-handler';
 import { Renderer, type RenderState } from './renderer';
-import { createPlayer, type Player } from '../entities/player';
-import type { Enemy } from '../entities/enemy';
-import type { Item } from '../entities/item';
-import { Random } from '../utils/random';
-import { pushMessages } from '../ui/message-log';
 
 type GameState = RenderState;
 
@@ -27,6 +30,9 @@ export class Game {
   private player!: Player;
   private enemies: Enemy[] = [];
   private items: Item[] = [];
+  private chests: Chest[] = [];
+  private traps: Trap[] = [];
+  private npcs: Npc[] = [];
   private messages: string[] = [];
   private visibleTiles = new Set<string>();
   private animationFrame = 0;
@@ -49,6 +55,9 @@ export class Game {
       player: this.player ?? createPlayer(0, 0),
       enemies: this.enemies,
       items: this.items,
+      chests: this.chests,
+      traps: this.traps,
+      npcs: this.npcs,
       map: this.map ?? generateDungeon(1, 1).map,
       messages: this.messages,
       visibleTiles: this.visibleTiles,
@@ -129,10 +138,13 @@ export class Game {
 
   private generateFloor(): void {
     const floorSeed = Date.now() + this.floor * 100;
-    const { map, start, enemies, items } = generateDungeon(this.floor, floorSeed);
+    const { map, start, enemies, items, chests, traps, npcs } = generateDungeon(this.floor, floorSeed);
     this.map = map;
     this.enemies = enemies;
     this.items = items;
+    this.chests = chests;
+    this.traps = traps;
+    this.npcs = npcs;
     this.player.x = start.x;
     this.player.y = start.y;
     this.refreshVisibility();
@@ -168,13 +180,23 @@ export class Game {
       return;
     }
 
+    const npc = this.npcs.find((n) => n.x === nextX && n.y === nextY);
+    if (npc) {
+      this.interactWithNpc(npc);
+      this.advanceTurn();
+      return;
+    }
+
     const blockers = this.enemies.filter((candidate) => candidate.hp > 0);
     if (!canMoveTo(this.map, nextX, nextY, blockers)) {
       return;
     }
 
     moveActor(this.player, dx, dy);
+    this.checkChestsAtPlayer();
+    this.checkTrapsAtPlayer();
     this.pickupItemsAtPlayer();
+    this.checkNpcInteraction();
     if (this.player.x === this.map.stairs.x && this.player.y === this.map.stairs.y) {
       this.messages = pushMessages(this.messages, ['階段を見つけた。 > で次の階へ。']);
     }
@@ -196,6 +218,76 @@ export class Game {
     }
     this.items = this.items.filter((item) => item.x !== this.player.x || item.y !== this.player.y || !this.player.inventory.includes(item));
     this.messages = pushMessages(this.messages, messages);
+  }
+
+  private checkChestsAtPlayer(): void {
+    const chest = this.chests.find((c) => c.x === this.player.x && c.y === this.player.y && !c.opened);
+    if (!chest) return;
+    const loot = openChest(chest, this.random);
+    if (tryAddItem(this.player, loot)) {
+      this.messages = pushMessages(this.messages, [`宝箱を開けた！ ${loot.name}を手に入れた。`]);
+    } else {
+      this.items.push(loot);
+      this.messages = pushMessages(this.messages, [`宝箱を開けた！ ${loot.name}が足元に落ちた。`]);
+    }
+  }
+
+  private checkTrapsAtPlayer(): void {
+    const trap = this.traps.find((t) => t.x === this.player.x && t.y === this.player.y && !t.triggered);
+    if (!trap) return;
+    trap.triggered = true;
+
+    if (trap.kind === 'teleport') {
+      const walkable: { x: number; y: number }[] = [];
+      for (let y = 0; y < MAP_HEIGHT; y += 1) {
+        for (let x = 0; x < MAP_WIDTH; x += 1) {
+          if (!this.map.tiles[y][x].blocksMovement) walkable.push({ x, y });
+        }
+      }
+      const dest = this.random.pick(walkable);
+      this.player.x = dest.x;
+      this.player.y = dest.y;
+      this.messages = pushMessages(this.messages, ['テレポート罠を踏んだ！ どこかに飛ばされた…']);
+      return;
+    }
+
+    this.player.hp = Math.max(0, this.player.hp - trap.damage);
+    if (trap.kind === 'poison') {
+      this.messages = pushMessages(this.messages, [`毒の罠を踏んだ！ ${trap.damage}ダメージを受けた。`]);
+    } else {
+      this.messages = pushMessages(this.messages, [`トゲ罠を踏んだ！ ${trap.damage}ダメージを受けた。`]);
+    }
+  }
+
+  private checkNpcInteraction(): void {
+    // Handled separately in handleMove when bumping into NPC
+  }
+
+  private interactWithNpc(npc: Npc): void {
+    const msgs: string[] = [];
+    for (const line of npc.dialogue) {
+      msgs.push(`${npc.name}: ${line}`);
+    }
+
+    if (npc.role === 'healer' && !npc.interacted) {
+      npc.interacted = true;
+      this.player.hp = this.player.maxHp;
+      msgs.push('HPが全回復した！');
+    }
+
+    if (npc.role === 'merchant' && !npc.interacted) {
+      npc.interacted = true;
+      const template = this.random.pick(ITEM_TEMPLATES);
+      const gift = createItem(template, this.player.x, this.player.y, `merchant-${npc.id}`);
+      if (tryAddItem(this.player, gift)) {
+        msgs.push(`${gift.name}をもらった！`);
+      } else {
+        this.items.push(gift);
+        msgs.push(`${gift.name}が足元に置かれた。`);
+      }
+    }
+
+    this.messages = pushMessages(this.messages, msgs);
   }
 
   private advanceTurn(): void {

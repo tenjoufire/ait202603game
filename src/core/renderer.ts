@@ -10,9 +10,12 @@ import {
   VIEWPORT_HEIGHT,
   VIEWPORT_WIDTH,
 } from '../constants';
+import type { Chest } from '../entities/chest';
 import type { Enemy } from '../entities/enemy';
 import type { Item } from '../entities/item';
+import type { Npc } from '../entities/npc';
 import type { Player } from '../entities/player';
+import type { Trap } from '../entities/trap';
 import type { DungeonMap } from '../map/dungeon-generator';
 import { drawHud } from '../ui/hud';
 import { drawTitleScreen } from '../ui/title-screen';
@@ -25,6 +28,9 @@ export interface RenderPayload {
   player: Player;
   enemies: Enemy[];
   items: Item[];
+  chests: Chest[];
+  traps: Trap[];
+  npcs: Npc[];
   map: DungeonMap;
   messages: string[];
   visibleTiles: Set<string>;
@@ -99,8 +105,19 @@ export class Renderer {
       }
     }
 
+    for (const trap of payload.traps) {
+      if (trap.triggered) {
+        this.drawEntity(trap.x, trap.y, cameraX, cameraY, '^', '#ef4444', payload.visibleTiles);
+      }
+    }
+    for (const chest of payload.chests) {
+      this.drawEntity(chest.x, chest.y, cameraX, cameraY, chest.char, chest.color, payload.visibleTiles);
+    }
     for (const item of payload.items) {
       this.drawEntity(item.x, item.y, cameraX, cameraY, item.char, item.color, payload.visibleTiles);
+    }
+    for (const npc of payload.npcs) {
+      this.drawEntity(npc.x, npc.y, cameraX, cameraY, npc.char, npc.color, payload.visibleTiles);
     }
     for (const enemy of payload.enemies) {
       this.drawEntity(enemy.x, enemy.y, cameraX, cameraY, enemy.char, enemy.color, payload.visibleTiles);

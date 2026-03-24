@@ -1,6 +1,9 @@
 import { BSP_DEPTH, BSP_MAX_ROOM_SIZE, BSP_MIN_ROOM_SIZE, MAP_HEIGHT, MAP_WIDTH } from '../constants';
+import { createChest, type Chest } from '../entities/chest';
 import { createEnemy, getEnemyTemplatesForFloor, type Enemy } from '../entities/enemy';
 import { createItem, ITEM_TEMPLATES, type Item } from '../entities/item';
+import { createNpc, NPC_TEMPLATES, type Npc } from '../entities/npc';
+import { createTrap, TRAP_TEMPLATES, type Trap } from '../entities/trap';
 import { Random } from '../utils/random';
 import { Room } from './room';
 import { createTile, type Tile } from './tile';
@@ -27,6 +30,9 @@ export interface FloorContent {
   start: { x: number; y: number };
   enemies: Enemy[];
   items: Item[];
+  chests: Chest[];
+  traps: Trap[];
+  npcs: Npc[];
 }
 
 const createExplored = (width: number, height: number): boolean[][] => Array.from({ length: height }, () => Array.from({ length: width }, () => false));
@@ -137,28 +143,64 @@ export const generateDungeon = (floor: number, seed = Date.now()): FloorContent 
 
   const enemies: Enemy[] = [];
   const items: Item[] = [];
+  const chests: Chest[] = [];
+  const traps: Trap[] = [];
+  const npcs: Npc[] = [];
   const enemyTemplates = getEnemyTemplatesForFloor(floor);
   const itemPool = ITEM_TEMPLATES.filter((item) => floor >= 3 || item.key !== 'flame-sword');
+  const occupied = new Set<string>([`${start.x},${start.y}`, `${stairs.x},${stairs.y}`]);
+
+  const tryPosition = (room: Room): { x: number; y: number } | null => {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const position = randomOpenPosition(room, random);
+      const key = `${position.x},${position.y}`;
+      if (!occupied.has(key)) {
+        occupied.add(key);
+        return position;
+      }
+    }
+    return null;
+  };
 
   rooms.slice(1).forEach((room, index) => {
     const enemyCount = random.int(0, floor >= 4 ? 3 : 2);
     for (let count = 0; count < enemyCount; count += 1) {
-      const position = randomOpenPosition(room, random);
-      if ((position.x === stairs.x && position.y === stairs.y) || enemies.some((enemy) => enemy.x === position.x && enemy.y === position.y)) {
-        continue;
-      }
+      const position = tryPosition(room);
+      if (!position) continue;
       const template = floor >= 5 && index === rooms.length - 2 ? enemyTemplates[enemyTemplates.length - 1] : random.pick(enemyTemplates);
       enemies.push(createEnemy(template, position.x, position.y, `${floor}-${index}-${count}`));
     }
 
     if (random.chance(0.55)) {
-      const position = randomOpenPosition(room, random);
-      if ((position.x === stairs.x && position.y === stairs.y) || items.some((item) => item.x === position.x && item.y === position.y)) {
-        return;
-      }
+      const position = tryPosition(room);
+      if (!position) return;
       items.push(createItem(random.pick(itemPool), position.x, position.y, `${floor}-${index}`));
     }
+
+    if (random.chance(0.35)) {
+      const position = tryPosition(room);
+      if (position) {
+        chests.push(createChest(position.x, position.y, random, `${floor}-${index}`));
+      }
+    }
+
+    if (random.chance(0.3)) {
+      const position = tryPosition(room);
+      if (position) {
+        traps.push(createTrap(random.pick(TRAP_TEMPLATES), position.x, position.y, `${floor}-${index}`));
+      }
+    }
   });
+
+  // Place one NPC per floor in a random middle room
+  if (rooms.length > 2) {
+    const npcRoom = random.pick(rooms.slice(1, -1));
+    const npcPos = tryPosition(npcRoom);
+    if (npcPos) {
+      const npcTemplate = random.pick(NPC_TEMPLATES);
+      npcs.push(createNpc(npcTemplate, npcPos.x, npcPos.y, `${floor}`));
+    }
+  }
 
   return {
     map: {
@@ -172,5 +214,8 @@ export const generateDungeon = (floor: number, seed = Date.now()): FloorContent 
     start,
     enemies,
     items,
+    chests,
+    traps,
+    npcs,
   };
 };
