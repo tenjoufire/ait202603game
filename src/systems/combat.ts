@@ -26,9 +26,9 @@ export const grantExperience = (player: Player, enemy: Enemy): string[] => {
   while (player.exp >= player.expToNext) {
     player.exp -= player.expToNext;
     player.level += 1;
-    player.expToNext = Math.floor(player.level * 40 + player.level * player.level * 2);
-    player.maxHp += 12;
-    player.attack += 2;
+    player.expToNext = Math.floor(player.level * 50 + player.level * player.level * 3);
+    player.maxHp += 8;
+    player.attack += 1;
     player.defense += 1;
     player.hp = player.maxHp;
     messages.push(`レベルアップ！ Lv.${player.level} になった。`);

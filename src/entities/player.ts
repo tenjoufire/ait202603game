@@ -28,7 +28,7 @@ export const createPlayer = (x: number, y: number): Player => ({
   defense: PLAYER_INITIAL_DEF,
   level: 1,
   exp: 0,
-  expToNext: 50,
+  expToNext: 60,
   inventory: [],
   equippedWeapon: null,
   equippedArmor: null,

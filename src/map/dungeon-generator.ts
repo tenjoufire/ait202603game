@@ -163,29 +163,29 @@ export const generateDungeon = (floor: number, seed = Date.now()): FloorContent 
   };
 
   rooms.slice(1).forEach((room, index) => {
-    const maxEnemies = floor >= 4 ? 3 : floor >= 2 ? 2 : 1;
-    const enemyCount = random.int(0, maxEnemies);
+    const maxEnemies = floor >= 4 ? 4 : floor >= 2 ? 3 : 2;
+    const enemyCount = random.int(1, maxEnemies);
     for (let count = 0; count < enemyCount; count += 1) {
       const position = tryPosition(room);
       if (!position) continue;
       const template = floor >= 5 && index === rooms.length - 2 ? enemyTemplates[enemyTemplates.length - 1] : random.pick(enemyTemplates);
-      enemies.push(createEnemy(template, position.x, position.y, `${floor}-${index}-${count}`));
+      enemies.push(createEnemy(template, position.x, position.y, `${floor}-${index}-${count}`, floor));
     }
 
-    if (random.chance(0.55)) {
+    if (random.chance(0.4)) {
       const position = tryPosition(room);
       if (!position) return;
       items.push(createItem(random.pick(itemPool), position.x, position.y, `${floor}-${index}`));
     }
 
-    if (random.chance(0.35)) {
+    if (random.chance(0.25)) {
       const position = tryPosition(room);
       if (position) {
         chests.push(createChest(position.x, position.y, random, `${floor}-${index}`));
       }
     }
 
-    if (random.chance(0.3)) {
+    if (random.chance(0.4)) {
       const position = tryPosition(room);
       if (position) {
         traps.push(createTrap(random.pick(TRAP_TEMPLATES), position.x, position.y, `${floor}-${index}`));

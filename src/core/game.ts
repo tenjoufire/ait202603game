@@ -281,8 +281,9 @@ export class Game {
 
     if (npc.role === 'healer' && !npc.interacted) {
       npc.interacted = true;
-      this.player.hp = this.player.maxHp;
-      msgs.push('HPが全回復した！');
+      const healAmount = Math.floor(this.player.maxHp * 0.5);
+      this.player.hp = Math.min(this.player.maxHp, this.player.hp + healAmount);
+      msgs.push(`HPが${healAmount}回復した！`);
     }
 
     if (npc.role === 'merchant' && !npc.interacted) {
