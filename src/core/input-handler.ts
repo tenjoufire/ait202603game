@@ -6,7 +6,8 @@ export type InputAction =
   | 'wait'
   | 'descend'
   | { type: 'move'; dx: number; dy: number }
-  | { type: 'inventory-slot'; index: number };
+  | { type: 'inventory-slot'; index: number }
+  | { type: 'select-difficulty'; direction: 'up' | 'down' };
 
 const moveBindings = new Map<string, { dx: number; dy: number }>([
   ['ArrowUp', { dx: 0, dy: -1 }],

@@ -1,6 +1,8 @@
 import type { Enemy } from '../entities/enemy';
 import type { Fighter } from '../entities/entity';
 import type { Player } from '../entities/player';
+import type { DifficultyConfig } from '../difficulty';
+import { DIFFICULTY_PRESETS } from '../difficulty';
 import { Random } from '../utils/random';
 
 export interface AttackResult {
@@ -17,7 +19,7 @@ export const attackTarget = (attacker: Fighter, defender: Fighter, random: Rando
   return { damage, defeated: defender.hp === 0 };
 };
 
-export const grantExperience = (player: Player, enemy: Enemy): string[] => {
+export const grantExperience = (player: Player, enemy: Enemy, config: DifficultyConfig = DIFFICULTY_PRESETS.normal): string[] => {
   const messages: string[] = [];
   player.exp += enemy.expReward;
   player.score += enemy.expReward;
@@ -26,10 +28,10 @@ export const grantExperience = (player: Player, enemy: Enemy): string[] => {
   while (player.exp >= player.expToNext) {
     player.exp -= player.expToNext;
     player.level += 1;
-    player.expToNext = Math.floor(player.level * 40 + player.level * player.level * 2);
-    player.maxHp += 12;
-    player.attack += 2;
-    player.defense += 1;
+    player.expToNext = Math.floor(player.level * config.expCurveLinear + player.level * player.level * config.expCurveSq);
+    player.maxHp += config.levelUpHp;
+    player.attack += config.levelUpAtk;
+    player.defense += config.levelUpDef;
     player.hp = player.maxHp;
     messages.push(`レベルアップ！ Lv.${player.level} になった。`);
   }

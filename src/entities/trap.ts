@@ -15,8 +15,8 @@ export interface TrapTemplate {
 }
 
 export const TRAP_TEMPLATES: TrapTemplate[] = [
-  { key: 'spike', name: 'トゲ罠', damage: 15 },
-  { key: 'poison', name: '毒の罠', damage: 10 },
+  { key: 'spike', name: 'トゲ罠', damage: 25 },
+  { key: 'poison', name: '毒の罠', damage: 15 },
   { key: 'teleport', name: 'テレポート罠', damage: 0 },
 ];
 

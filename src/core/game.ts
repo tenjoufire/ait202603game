@@ -1,4 +1,5 @@
 import { MAP_HEIGHT, MAP_WIDTH, MAX_HIGH_SCORES } from '../constants';
+import { DIFFICULTIES, DIFFICULTY_PRESETS, type Difficulty, type DifficultyConfig } from '../difficulty';
 import { openChest, type Chest } from '../entities/chest';
 import type { Enemy } from '../entities/enemy';
 import { createItem, ITEM_TEMPLATES, type Item } from '../entities/item';
@@ -39,6 +40,8 @@ export class Game {
   private visibleTiles = new Set<string>();
   private animationFrame = 0;
   private highScores: number[] = [];
+  private selectedDifficulty: Difficulty = 'normal';
+  private difficultyConfig: DifficultyConfig = DIFFICULTY_PRESETS.normal;
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new Renderer(canvas);
@@ -69,12 +72,25 @@ export class Game {
       highScores: this.highScores,
       effects: this.effects.getActiveEffects(),
       screenOffset: this.effects.getScreenOffset(),
+      selectedDifficulty: this.selectedDifficulty,
     });
     this.animationFrame = window.requestAnimationFrame(this.loop);
   };
 
   private handleAction(action: InputAction): void {
     if (this.state === 'title') {
+      if (typeof action === 'object' && action.type === 'move') {
+        if (action.dy === -1) {
+          const idx = DIFFICULTIES.indexOf(this.selectedDifficulty);
+          this.selectedDifficulty = DIFFICULTIES[(idx - 1 + DIFFICULTIES.length) % DIFFICULTIES.length];
+          this.difficultyConfig = DIFFICULTY_PRESETS[this.selectedDifficulty];
+        } else if (action.dy === 1) {
+          const idx = DIFFICULTIES.indexOf(this.selectedDifficulty);
+          this.selectedDifficulty = DIFFICULTIES[(idx + 1) % DIFFICULTIES.length];
+          this.difficultyConfig = DIFFICULTY_PRESETS[this.selectedDifficulty];
+        }
+        return;
+      }
       if (action === 'start') {
         this.startNewGame();
       }
@@ -138,14 +154,14 @@ export class Game {
   private startNewGame(): void {
     this.floor = 1;
     this.messages = ['迷宮へようこそ。'];
-    this.player = createPlayer(0, 0);
+    this.player = createPlayer(0, 0, this.difficultyConfig);
     this.generateFloor();
     this.state = 'playing';
   }
 
   private generateFloor(): void {
     const floorSeed = Date.now() + this.floor * 100;
-    const { map, start, enemies, items, chests, traps, npcs } = generateDungeon(this.floor, floorSeed);
+    const { map, start, enemies, items, chests, traps, npcs } = generateDungeon(this.floor, floorSeed, this.difficultyConfig);
     this.map = map;
     this.enemies = enemies;
     this.items = items;
@@ -176,7 +192,7 @@ export class Game {
       const entries = [`プレイヤーの攻撃。${enemy.name}に${result.damage}ダメージ。`];
       this.effects.onPlayerAttack(enemy.x, enemy.y, result.damage);
       if (result.defeated) {
-        entries.push(...grantExperience(this.player, enemy));
+        entries.push(...grantExperience(this.player, enemy, this.difficultyConfig));
         this.effects.onEnemyDefeated(enemy.x, enemy.y);
       }
       this.messages = pushMessages(this.messages, entries);
@@ -281,8 +297,9 @@ export class Game {
 
     if (npc.role === 'healer' && !npc.interacted) {
       npc.interacted = true;
-      this.player.hp = this.player.maxHp;
-      msgs.push('HPが全回復した！');
+      const healAmount = Math.floor(this.player.maxHp * this.difficultyConfig.healerFraction);
+      this.player.hp = Math.min(this.player.maxHp, this.player.hp + healAmount);
+      msgs.push(`HPが${healAmount}回復した！`);
     }
 
     if (npc.role === 'merchant' && !npc.interacted) {
