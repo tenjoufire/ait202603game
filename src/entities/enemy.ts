@@ -39,6 +39,9 @@ export const ENEMY_TEMPLATES: EnemyTemplate[] = [
 
 export const getEnemyTemplatesForFloor = (floor: number): EnemyTemplate[] => ENEMY_TEMPLATES.filter((template) => template.minFloor <= floor);
 
+const scaleStat = (base: number, floorsAboveMin: number, floorScale: number, statScale: number, min = 0): number =>
+  Math.max(min, Math.floor((base + Math.floor(floorsAboveMin * floorScale * base)) * statScale));
+
 export const createEnemy = (
   template: EnemyTemplate,
   x: number,
@@ -48,11 +51,9 @@ export const createEnemy = (
   config: DifficultyConfig = DIFFICULTY_PRESETS.normal,
 ): Enemy => {
   const floorsAboveMin = floor - template.minFloor;
-  const floorScale = config.enemyFloorScale;
-  const statScale = config.enemyStatScale;
-  const scaledHp = Math.max(1, Math.floor((template.hp + Math.floor(floorsAboveMin * floorScale * template.hp)) * statScale));
-  const scaledAttack = Math.max(1, Math.floor((template.attack + Math.floor(floorsAboveMin * floorScale * template.attack)) * statScale));
-  const scaledDefense = Math.floor((template.defense + Math.floor(floorsAboveMin * floorScale * template.defense)) * statScale);
+  const scaledHp = scaleStat(template.hp, floorsAboveMin, config.enemyFloorScale, config.enemyStatScale, 1);
+  const scaledAttack = scaleStat(template.attack, floorsAboveMin, config.enemyFloorScale, config.enemyStatScale, 1);
+  const scaledDefense = scaleStat(template.defense, floorsAboveMin, config.enemyFloorScale, config.enemyStatScale);
   return {
     id: `enemy-${template.key}-${suffix}`,
     name: template.name,

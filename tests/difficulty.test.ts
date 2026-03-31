@@ -126,7 +126,7 @@ describe('difficulty-aware dungeon generation', () => {
   it('easy dungeons may have fewer enemies per room', () => {
     let easyTotal = 0;
     let hardTotal = 0;
-    for (let seed = 0; seed < 5; seed += 1) {
+    for (let seed = 0; seed < 50; seed += 1) {
       easyTotal += generateDungeon(1, seed * 100, DIFFICULTY_PRESETS.easy).enemies.length;
       hardTotal += generateDungeon(1, seed * 100, DIFFICULTY_PRESETS.hard).enemies.length;
     }
@@ -136,7 +136,7 @@ describe('difficulty-aware dungeon generation', () => {
   it('easy dungeons have more items', () => {
     let easyTotal = 0;
     let hardTotal = 0;
-    for (let seed = 0; seed < 10; seed += 1) {
+    for (let seed = 0; seed < 50; seed += 1) {
       easyTotal += generateDungeon(2, seed * 100, DIFFICULTY_PRESETS.easy).items.length;
       hardTotal += generateDungeon(2, seed * 100, DIFFICULTY_PRESETS.hard).items.length;
     }
