@@ -1,3 +1,5 @@
+import type { DifficultyConfig } from '../difficulty';
+import { DIFFICULTY_PRESETS } from '../difficulty';
 import type { Entity, Fighter } from './entity';
 
 export type EnemyBehavior = 'wander' | 'chase' | 'ranged' | 'boss';
@@ -37,11 +39,20 @@ export const ENEMY_TEMPLATES: EnemyTemplate[] = [
 
 export const getEnemyTemplatesForFloor = (floor: number): EnemyTemplate[] => ENEMY_TEMPLATES.filter((template) => template.minFloor <= floor);
 
-export const createEnemy = (template: EnemyTemplate, x: number, y: number, suffix: string, floor = 1): Enemy => {
+export const createEnemy = (
+  template: EnemyTemplate,
+  x: number,
+  y: number,
+  suffix: string,
+  floor = 1,
+  config: DifficultyConfig = DIFFICULTY_PRESETS.normal,
+): Enemy => {
   const floorsAboveMin = floor - template.minFloor;
-  const scaledHp = template.hp + Math.floor(floorsAboveMin * 0.1 * template.hp);
-  const scaledAttack = template.attack + Math.floor(floorsAboveMin * 0.1 * template.attack);
-  const scaledDefense = template.defense + Math.floor(floorsAboveMin * 0.1 * template.defense);
+  const floorScale = config.enemyFloorScale;
+  const statScale = config.enemyStatScale;
+  const scaledHp = Math.max(1, Math.floor((template.hp + Math.floor(floorsAboveMin * floorScale * template.hp)) * statScale));
+  const scaledAttack = Math.max(1, Math.floor((template.attack + Math.floor(floorsAboveMin * floorScale * template.attack)) * statScale));
+  const scaledDefense = Math.floor((template.defense + Math.floor(floorsAboveMin * floorScale * template.defense)) * statScale);
   return {
     id: `enemy-${template.key}-${suffix}`,
     name: template.name,

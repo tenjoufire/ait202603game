@@ -1,4 +1,6 @@
-import { FOV_RADIUS, PLAYER_INITIAL_ATK, PLAYER_INITIAL_DEF, PLAYER_INITIAL_HP } from '../constants';
+import { FOV_RADIUS } from '../constants';
+import type { DifficultyConfig } from '../difficulty';
+import { DIFFICULTY_PRESETS } from '../difficulty';
 import type { Fighter } from './entity';
 import type { Item } from './item';
 import type { Entity } from './entity';
@@ -14,7 +16,7 @@ export interface Player extends Entity, Fighter {
   fovRadius: number;
 }
 
-export const createPlayer = (x: number, y: number): Player => ({
+export const createPlayer = (x: number, y: number, config: DifficultyConfig = DIFFICULTY_PRESETS.normal): Player => ({
   id: 'player',
   name: 'プレイヤー',
   char: '@',
@@ -22,13 +24,13 @@ export const createPlayer = (x: number, y: number): Player => ({
   blocksMovement: true,
   x,
   y,
-  maxHp: PLAYER_INITIAL_HP,
-  hp: PLAYER_INITIAL_HP,
-  attack: PLAYER_INITIAL_ATK,
-  defense: PLAYER_INITIAL_DEF,
+  maxHp: config.playerHp,
+  hp: config.playerHp,
+  attack: config.playerAtk,
+  defense: config.playerDef,
   level: 1,
   exp: 0,
-  expToNext: 60,
+  expToNext: config.playerExpToNext,
   inventory: [],
   equippedWeapon: null,
   equippedArmor: null,

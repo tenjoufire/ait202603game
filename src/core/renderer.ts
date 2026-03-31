@@ -10,6 +10,7 @@ import {
   VIEWPORT_HEIGHT,
   VIEWPORT_WIDTH,
 } from '../constants';
+import type { Difficulty } from '../difficulty';
 import type { Chest } from '../entities/chest';
 import type { Enemy } from '../entities/enemy';
 import type { Item } from '../entities/item';
@@ -40,6 +41,7 @@ export interface RenderPayload {
   highScores: number[];
   effects: readonly VisualEffect[];
   screenOffset: { x: number; y: number };
+  selectedDifficulty: Difficulty;
 }
 
 const tileToSprite = (type: TileType): SpriteKey => {
@@ -96,7 +98,7 @@ export class Renderer {
 
   render(payload: RenderPayload): void {
     if (payload.state === 'title') {
-      drawTitleScreen(this.context, this.atlas);
+      drawTitleScreen(this.context, this.atlas, payload.selectedDifficulty);
       return;
     }
 

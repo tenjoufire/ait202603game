@@ -1,7 +1,9 @@
 import { BSP_DEPTH, BSP_MAX_ROOM_SIZE, BSP_MIN_ROOM_SIZE, MAP_HEIGHT, MAP_WIDTH } from '../constants';
+import type { DifficultyConfig } from '../difficulty';
+import { DIFFICULTY_PRESETS } from '../difficulty';
 import { createChest, type Chest } from '../entities/chest';
 import { createEnemy, getEnemyTemplatesForFloor, type Enemy } from '../entities/enemy';
-import { createItem, ITEM_TEMPLATES, type Item } from '../entities/item';
+import { createItem, ITEM_TEMPLATES, type Item, type ItemTemplate } from '../entities/item';
 import { createNpc, NPC_TEMPLATES, type Npc } from '../entities/npc';
 import { createTrap, TRAP_TEMPLATES, type Trap } from '../entities/trap';
 import { Random } from '../utils/random';
@@ -115,7 +117,7 @@ const randomOpenPosition = (room: Room, random: Random): { x: number; y: number 
   y: random.int(room.y + 1, room.y + room.height - 2),
 });
 
-export const generateDungeon = (floor: number, seed = Date.now()): FloorContent => {
+export const generateDungeon = (floor: number, seed = Date.now(), config: DifficultyConfig = DIFFICULTY_PRESETS.normal): FloorContent => {
   const random = new Random(seed + floor * 9973);
   const tiles = Array.from({ length: MAP_HEIGHT }, () => Array.from({ length: MAP_WIDTH }, () => createTile('wall')));
   const leaves = generateLeaves(random);
@@ -147,7 +149,16 @@ export const generateDungeon = (floor: number, seed = Date.now()): FloorContent 
   const traps: Trap[] = [];
   const npcs: Npc[] = [];
   const enemyTemplates = getEnemyTemplatesForFloor(floor);
-  const itemPool = ITEM_TEMPLATES.filter((item) => floor >= 3 || item.key !== 'flame-sword');
+
+  // Build item pool with difficulty-adjusted heal powers
+  const itemPool: ItemTemplate[] = ITEM_TEMPLATES
+    .filter((item) => floor >= 3 || item.key !== 'flame-sword')
+    .map((item) => {
+      if (item.key === 'potion') return { ...item, power: config.potionPower };
+      if (item.key === 'greater-potion') return { ...item, power: config.greaterPotionPower };
+      return item;
+    });
+
   const occupied = new Set<string>([`${start.x},${start.y}`, `${stairs.x},${stairs.y}`]);
 
   const tryPosition = (room: Room): { x: number; y: number } | null => {
@@ -163,32 +174,34 @@ export const generateDungeon = (floor: number, seed = Date.now()): FloorContent 
   };
 
   rooms.slice(1).forEach((room, index) => {
-    const maxEnemies = floor >= 4 ? 4 : floor >= 2 ? 3 : 2;
-    const enemyCount = random.int(1, maxEnemies);
+    const maxEnemies = floor >= 4 ? config.enemyCountMaxFloor4 : floor >= 2 ? config.enemyCountMaxFloor2 : config.enemyCountMaxFloor1;
+    const enemyCount = random.int(config.enemyCountMin, maxEnemies);
     for (let count = 0; count < enemyCount; count += 1) {
       const position = tryPosition(room);
       if (!position) continue;
       const template = floor >= 5 && index === rooms.length - 2 ? enemyTemplates[enemyTemplates.length - 1] : random.pick(enemyTemplates);
-      enemies.push(createEnemy(template, position.x, position.y, `${floor}-${index}-${count}`, floor));
+      enemies.push(createEnemy(template, position.x, position.y, `${floor}-${index}-${count}`, floor, config));
     }
 
-    if (random.chance(0.4)) {
+    if (random.chance(config.itemSpawnChance)) {
       const position = tryPosition(room);
       if (!position) return;
       items.push(createItem(random.pick(itemPool), position.x, position.y, `${floor}-${index}`));
     }
 
-    if (random.chance(0.25)) {
+    if (random.chance(config.chestSpawnChance)) {
       const position = tryPosition(room);
       if (position) {
         chests.push(createChest(position.x, position.y, random, `${floor}-${index}`));
       }
     }
 
-    if (random.chance(0.4)) {
+    if (random.chance(config.trapSpawnChance)) {
       const position = tryPosition(room);
       if (position) {
-        traps.push(createTrap(random.pick(TRAP_TEMPLATES), position.x, position.y, `${floor}-${index}`));
+        const trapTemplate = random.pick(TRAP_TEMPLATES);
+        const scaledTrapTemplate = { ...trapTemplate, damage: Math.floor(trapTemplate.damage * config.trapDamageScale) };
+        traps.push(createTrap(scaledTrapTemplate, position.x, position.y, `${floor}-${index}`));
       }
     }
   });
